@@ -1,0 +1,151 @@
+/*
+Write a program to minimize any given DFA.
+*/
+
+#include <stdio.h>
+
+#define MAX 20
+#define ALPHABET 10
+
+int n, m;
+char sym[ALPHABET];
+int trans[MAX][ALPHABET];
+int finalState[MAX], reach[MAX];
+int mark[MAX][MAX], group[MAX];
+
+void findReachable(int s) {
+    if (reach[s])
+        return;
+    reach[s] = 1;
+    for (int i = 0; i < m; i++) {
+        findReachable(trans[s][i]);
+    }
+}
+
+void minimize() {
+    int change, p, q;
+
+    // 1. Mark pairs where one is final and other is non-final
+    for (int i = 0; i < n; i++) {
+        for (int j = i + 1; j < n; j++) {
+            if (reach[i] && reach[j] && finalState[i] != finalState[j]) {
+                mark[i][j] = mark[j][i] = 1;
+            }
+        }
+    }
+
+    // 2. Propagate marks: if on any symbol transitions go to a marked pair, mark (i, j)
+    do {
+        change = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (!reach[i] || !reach[j] || mark[i][j])
+                    continue;
+
+                for (int k = 0; k < m; k++) {
+                    p = trans[i][k];
+                    q = trans[j][k];
+
+                    if (mark[p][q] || mark[q][p]) {
+                        mark[i][j] = mark[j][i] = 1;
+                        change = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    } while (change);
+}
+
+void makeGroups() {
+    int g = 0;
+    for (int i = 0; i < n; i++) group[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        if (!reach[i] || group[i] != -1)
+            continue;
+        group[i] = g;
+        for (int j = i + 1; j < n; j++) {
+            if (reach[j] && !mark[i][j]) {
+                group[j] = g;
+            }
+        }
+        g++;
+    }
+}
+
+int main() {
+    int f, x, rep, maxGroup;
+
+    printf("Enter number of states: ");
+    if (scanf("%d", &n) != 1 || n < 1 || n > MAX) return 1;
+
+    printf("Enter number of input symbols: ");
+    if (scanf("%d", &m) != 1 || m < 1 || m > ALPHABET) return 1;
+
+    printf("Enter input symbols (e.g. a b): ");
+    for (int i = 0; i < m; i++)
+        scanf(" %c", &sym[i]);
+
+    printf("\nEnter transition table:\n");
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            printf("  State q%d on '%c' -> q", i, sym[j]);
+            if (scanf("%d", &trans[i][j]) != 1 || trans[i][j] < 0 || trans[i][j] >= n) return 1;
+        }
+    }
+
+    printf("\nEnter number of final states: ");
+    if (scanf("%d", &f) != 1 || f < 0 || f > n) return 1;
+
+    printf("Enter final states (e.g. 2 3): ");
+    for (int i = 0; i < f; i++) {
+        if (scanf("%d", &x) != 1 || x < 0 || x >= n) return 1;
+        finalState[x] = 1;
+    }
+
+    findReachable(0);
+
+    minimize();
+    makeGroups();
+
+    // Find total distinct groups
+    maxGroup = -1;
+    for (int i = 0; i < n; i++)
+        if (group[i] > maxGroup) maxGroup = group[i];
+
+    printf("\n--- Equivalent State Groups ---\n");
+    for (int i = 0; i <= maxGroup; i++) {
+        printf("Group Q%d = { ", i);
+        for (int j = 0; j < n; j++) {
+            if (group[j] == i) printf("q%d ", j);
+        }
+        printf("}\n");
+    }
+
+    // Minimized DFA Table
+    printf("\n--- Minimized DFA Transition Table ---\n");
+    printf("State\t");
+    for (int i = 0; i < m; i++) printf("%c\t", sym[i]);
+    printf("Final State?\n");
+
+    for (int i = 0; i <= maxGroup; i++) {
+        // Find representative state for group i
+        rep = -1;
+        for (int j = 0; j < n; j++) {
+            if (group[j] == i) {
+                rep = j;
+                break;
+            }
+        }
+
+        printf("Q%d\t", i);
+        for (int j = 0; j < m; j++) {
+            printf("Q%d\t", group[trans[rep][j]]);
+        }
+        printf("%s\n", finalState[rep] ? "Yes" : "No");
+    }
+
+    printf("\nStart State: Q%d\n", group[0]);
+    return 0;
+}
